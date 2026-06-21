@@ -1,0 +1,11 @@
+{
+  "name": "go-debug-agent-demo",
+  "version": "1.0.0",
+  "description": "Playwright recording script for Go Debug Agent demo",
+  "scripts": {
+    "record": "node demo-record.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

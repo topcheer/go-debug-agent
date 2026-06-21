@@ -1,0 +1,14 @@
+*.dll
+*.dylib
+*.exe
+*.out
+*.pyc
+*.so
+*.test
+.DS_Store
+.env
+__pycache__/
+demo-recordings/
+go.sum
+node_modules/
+vendor/
