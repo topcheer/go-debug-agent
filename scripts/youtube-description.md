@@ -89,14 +89,12 @@ github.com/topcheer/go-debug-agent
 ## Chapters
 
 00:00 Introduction
-01:15 Go Runtime — Memory, GC, Allocations
-03:20 Goroutines + Context Tree
-05:30 HTTP Requests + Gin Routes
-07:10 Database + GORM Models
-09:15 Redis Inspector
-10:50 pprof Profiles
-12:20 Comprehensive Multi-Tool Debugging
-14:00 Summary + Quick Start Guide
+00:22 Go Runtime — Memory, GC, Allocations
+02:21 Goroutines + Build Info
+04:20 HTTP Requests + Gin Routes
+06:20 Database + GORM Models
+08:19 Redis + Network
+10:18 Comprehensive Multi-Tool Debugging
 
 ---
 
