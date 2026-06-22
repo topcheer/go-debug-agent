@@ -1,4 +1,4 @@
-module github.com/ggcode/debugagent
+module github.com/topcheer/go-debug-agent
 
 go 1.25.0
 

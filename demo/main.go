@@ -17,7 +17,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	agent "github.com/ggcode/debugagent"
+	agent "github.com/topcheer/go-debug-agent"
 )
 
 // ─── GORM model ─────────────────────────────────────────────────────────────
