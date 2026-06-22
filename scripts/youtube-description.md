@@ -2,107 +2,81 @@
 
 ## Title
 
-Go Debug Agent — AI-Powered In-Process Diagnostics (36 Tools / 12 Inspectors)
+Go Debug Agent v0.5.0 — Security, Health, Scheduler, Error Tracking, WebSocket (65 Tools)
 
 ## Description
 
-Chat with your LIVE Go application at runtime. The Go Debug Agent embeds directly into your app and gives an AI assistant access to 36 diagnostic tools across 12 inspectors — runtime memory, goroutines, database pools, build info, network, HTTP requests, system, Redis, Gin routes, GORM models, pprof profiles, and context trees.
+Chat with your LIVE Go application at runtime. The Go Debug Agent embeds directly into your app and gives an AI assistant access to 65 diagnostic tools across 24 inspectors.
 
-No external agents. No attach-to-process. No separate monitoring stack. Just one import, one line of code, and you're chatting with your running app.
+v0.5.0 adds five new inspectors that bring production-grade observability directly into your AI debugging workflow.
 
-### What you'll see in this demo
+NEW — Security Inspector
+Inspect auth middleware configs with JWT secrets auto-masked. List active user sessions with IPs. Show password policies with min length, complexity, and expiry rules.
 
-**Section 1 — Go Runtime Deep Dive**
-Memory stats, allocation tracking, GC pause times, forcing a garbage collection, and runtime info — all through natural language.
+NEW — Health Inspector
+Run registered health checks on demand. Get aggregated UP/DOWN/DEGRADED status. Deep-dive into individual components like database, Redis, and disk. Every check is wrapped in panic recovery.
 
-**Section 2 — Goroutines + Context**
-Counting goroutines, dumping stack traces grouped by similarity, detecting leaked goroutines, and inspecting the context tree.
+NEW — Scheduler Inspector
+Track background jobs and cron schedules. View schedule expressions, next/last run times, and execution history with success rates. Jobs auto-tracked via a ticker wrapper.
 
-**Section 3 — HTTP Requests + Gin Routes**
-Discovering all Gin routes with handlers, analyzing recent HTTP traffic, identifying slow and error requests.
+NEW — Error Tracking Inspector
+Capture runtime errors and panics in a 50-entry ring buffer. Compute error rates per minute and top error types. Group similar errors by normalized patterns. Panics auto-captured via recovery middleware.
 
-**Section 4 — Database + GORM**
-Inspecting database/sql connection pool stats, listing GORM models and table names, checking migration status.
+NEW — WebSocket Inspector
+Monitor live WebSocket connections with session IDs and remote addresses. Track aggregate message stats and average sizes. List pub/sub rooms with subscriber counts.
 
-**Section 5 — Redis Inspector**
-Server info, keyspace scan with pattern matching, connected client stats and slow log.
+The demo also showcases all previously released inspectors: runtime memory and GC, goroutine analysis, HTTP request tracking, Gin/Echo/Chi routes, database pools, GORM models, Redis info and latency, pprof profiles, logging buffers, custom metrics, file descriptors, and context trees.
 
-**Section 6 — pprof Profiles**
-Goroutine profile, heap allocation profile, and CPU profile snapshot via runtime/pprof.
-
-**Section 7 — Comprehensive Debugging**
-Multi-tool correlation: memory + GC + goroutines + Redis + GORM + routes + requests — all in one analysis.
-
-### Quick Start
+Quick Start — one import, one line:
 
 ```go
-package main
-
-import (
-    "net/http"
-    agent "github.com/topcheer/go-debug-agent"
-)
-
-func main() {
-    http.Handle("/agent/", agent.Middleware(nil))
-    http.ListenAndServe(":8080", nil)
-}
+import agent "github.com/ggcode/debugagent"
+http.Handle("/agent/", agent.Middleware(nil))
 ```
 
-Open `http://localhost:8080/agent` and start chatting with your app.
+Open localhost:8080/agent and chat with your app.
 
-### Features
+Features
+- 65 tools across 24 inspectors
+- Auto-masking of all secret fields
+- Panic recovery on every health check and HTTP handler
+- Ring buffer error capture with pattern analysis
+- WebSocket lifecycle tracking with room support
+- All inspectors defensive — nil checks and recover everywhere
+- Optional deps via reflection — no hard imports
+- Streaming AI responses with tool call badges
+- Works with any OpenAI-compatible LLM
 
-- 36 diagnostic tools across 12 inspectors
-- Streaming AI responses with real-time tool call badges
-- LLM-based context compression for long conversations
-- Custom tool registration via RegisterTool()
-- Works with any OpenAI-compatible LLM endpoint
-- Zero external dependencies (no Datadog, no Grafana, no APM)
-- Dark-themed chat UI built-in (single HTML page, no frontend framework)
+Inspector Coverage (65 tools / 24 inspectors)
+Runtime 5, Goroutine 4, HTTP Tracker 4, System 4, pprof 5, Logging 4, Redis 3, Routes 3, Cache 3, Metrics 3, Security 3, Health 3, Error Tracking 3, WebSocket 3, Database 2, Build Info 2, Network 2, GORM 2, HTTP Client 2, File Descriptors 2, Scheduler 2, Context 1, Sync 1
 
-### Inspector Coverage
-
-| Inspector | Tools | What it inspects |
-|-----------|-------|-----------------|
-| Runtime | 6 | Memory, alloc, GC stats |
-| Goroutine | 6 | Count, stacks, states, dumps, leaks |
-| Database | 2 | Connection pool stats |
-| Build Info | 2 | Go version, module deps |
-| Network | 2 | Addresses, DNS |
-| HTTP Tracker | 4 | Requests, slow, errors, stats |
-| System | 4 | Process, disk, env vars |
-| Redis | 3 | Server info, keys, client stats |
-| Gin Routes | 1 | Route discovery with handlers |
-| GORM | 2 | Models, migrations |
-| pprof | 3 | Goroutine, heap, CPU profiles |
-| Context | 1 | Active context tree |
-
-### GitHub
-
+GitHub
 github.com/topcheer/go-debug-agent
 
-### Tags
-
-#golang #godebugging #AI #Diagnostics #Goroutines #Redis #Gin #GORM #pprof #LLM #GLM #DeveloperTools #DevOps #ApplicationMonitoring #Go #AIOps #Observability
+Tags
+#golang #security #healthcheck #websocket #errorhandling #cron #scheduler #godebugging #AI #Diagnostics #Goroutines #Redis #Gin #GORM #DeveloperTools #DevOps #Go #AIOps #Observability
 
 ## Chapters
 
 00:00 Introduction
-00:22 Go Runtime — Memory, GC, Allocations
-02:21 Goroutines + Build Info
-04:20 HTTP Requests + Gin Routes
-06:20 Database + GORM Models
-08:19 Redis + Network
-10:18 Comprehensive Multi-Tool Debugging
+00:24 Go Runtime — Memory, GC, Allocations
+03:06 Goroutines + Build Info
+05:49 HTTP Requests + Gin Routes
+08:31 Database (GORM) + Redis Pool
+11:14 Logging + Cache Stats
+13:57 Security — Auth, Sessions
+16:39 Health Checks — DB, Redis, Disk
+19:22 Scheduler + Error Tracking
+22:04 Outbound HTTP + FD + Metrics
+24:47 Comprehensive Multi-Tool Debugging
 
 ---
 
 ## Thumbnail Text (for image)
 
-Go Debug Agent
+Go Debug Agent v0.5.0
 Chat with your LIVE app
-36 tools / 12 inspectors
+65 tools / 24 inspectors
 
 ---
 

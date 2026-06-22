@@ -24,4 +24,11 @@ func initInspectors() {
 	registerMetricsInspector()
 	registerContextInspector()
 	registerSyncInspector()
+
+	// v0.5.0 inspectors
+	registerSecurityInspector()
+	registerHealthInspector()
+	registerSchedulerInspector()
+	registerErrorInspector()
+	registerWebSocketInspector()
 }

@@ -3,10 +3,13 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 
 /**
- * Go Debug Agent — Full demo recording (25 tools / 8 inspectors)
+ * Go Debug Agent v0.5.0 — Full demo recording (65 tools / 18 inspectors)
  *
- * 6 sections using NATURAL LANGUAGE prompts (no explicit tool names).
+ * 10 sections using NATURAL LANGUAGE prompts (no explicit tool names).
  * The LLM must autonomously decide which tools to invoke.
+ *
+ * New v0.5.0 inspectors: Security, Health, Scheduler, Error Tracking,
+ * WebSocket, plus Redis, Gin routes, GORM, Logging, Cache, Outbound HTTP, Metrics.
  *
  * Usage:
  *   1. Start demo: cd go-debug-agent/demo && LLM_API_KEY=... go run .
@@ -70,13 +73,11 @@ async function pause(page, ms = 3000) {
   await page.waitForTimeout(ms);
 }
 
-// ─── Section 1: Go Runtime + Memory ────────────────────────────────────────
-// Tools: get_memory_stats, trigger_gc, get_runtime_info, get_gc_stats,
-//        get_alloc_stats, get_mem_stats, get_cpu_profile
+// ─── Section 1: Runtime Memory + GC + Allocations ───────────────────────────
 
 async function section1_runtime(page) {
-  console.log('  [1/6] Go Runtime + Memory Deep Dive');
-  await typeMessage(page, "My Go app feels sluggish. Can you check the overall runtime health — memory usage, GC stats, and the Go version we're running?");
+  console.log('  [1/10] Runtime Memory + GC + Allocations');
+  await typeMessage(page, "My Go app feels sluggish under load. Can you check the overall runtime health — memory usage, GC stats, and the Go version we're running?");
   await sendAndWait(page);
   await pause(page, 4000);
 
@@ -87,14 +88,13 @@ async function section1_runtime(page) {
   await typeMessage(page, "Try forcing a garbage collection — I want to see how much memory can be reclaimed.");
   await sendAndWait(page);
   await pause(page, 5000);
+  console.log('  → Transition: Goroutines + Build Info');
 }
 
-// ─── Section 2: Goroutines + Build Info ────────────────────────────────────
-// Tools: get_goroutine_count, get_goroutine_stacks, get_goroutine_states,
-//        get_goroutine_dump, get_build_info, get_module_deps
+// ─── Section 2: Goroutines + Build Info ─────────────────────────────────────
 
 async function section2_goroutines_build(page) {
-  console.log('  [2/6] Goroutines + Build Info');
+  console.log('  [2/10] Goroutines + Build Info');
   await typeMessage(page, "How many goroutines are currently running? Show me the state distribution — how many are running, waiting, or sleeping.");
   await sendAndWait(page);
   await pause(page, 4000);
@@ -106,14 +106,17 @@ async function section2_goroutines_build(page) {
   await typeMessage(page, "What Go version was this built with? Show me the module dependencies and their versions.");
   await sendAndWait(page);
   await pause(page, 5000);
+  console.log('  → Transition: HTTP Requests + Gin Routes');
 }
 
-// ─── Section 3: HTTP Request Tracking ──────────────────────────────────────
-// Tools: get_recent_requests, get_request_stats, get_slow_requests,
-//        get_error_requests
+// ─── Section 3: HTTP Requests + Gin Routes ──────────────────────────────────
 
-async function section3_http(page) {
-  console.log('  [3/6] HTTP Request Tracking');
+async function section3_http_routes(page) {
+  console.log('  [3/10] HTTP Requests + Gin Routes');
+  await typeMessage(page, "What API routes does this Gin application expose? List all the registered endpoints with their HTTP methods.");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
   await typeMessage(page, "What HTTP requests have come in recently? Show me the request statistics — P50, P95, P99 latency, and error rate.");
   await sendAndWait(page);
   await pause(page, 4000);
@@ -121,43 +124,122 @@ async function section3_http(page) {
   await typeMessage(page, "Which requests were the slowest? Also show me any error requests with 4xx or 5xx status codes.");
   await sendAndWait(page);
   await pause(page, 5000);
+  console.log('  → Transition: Database (GORM) + Redis Pool');
 }
 
-// ─── Section 4: System Info + Environment ──────────────────────────────────
-// Tools: get_system_info, get_process_info, get_disk_usage,
-//        get_environment_variables
+// ─── Section 4: Database (GORM) + Redis Pool ────────────────────────────────
 
-async function section4_system(page) {
-  console.log('  [4/6] System Info + Environment');
-  await typeMessage(page, "Give me the system info — hostname, CPU count, GOMAXPROCS. Also check the disk usage on this machine.");
+async function section4_db_redis(page) {
+  console.log('  [4/10] Database (GORM) + Redis Pool');
+  await typeMessage(page, "Is there a GORM database connection in this app? Show me the connection pool status — active, idle, and max connections.");
   await sendAndWait(page);
   await pause(page, 4000);
 
-  await typeMessage(page, "What environment variables are set? Filter for any that start with 'LLM' or 'GO'.");
-  await sendAndWait(page);
-  await pause(page, 5000);
-}
-
-// ─── Section 5: Network + DNS ──────────────────────────────────────────────
-// Tools: get_network_stats, get_dns_info
-
-async function section5_network(page) {
-  console.log('  [5/6] Network + DNS');
-  await typeMessage(page, "Show me the network configuration — local IP addresses, network interfaces, and hostname.");
+  await typeMessage(page, "Are there any slow database queries logged? I want to see if there are queries taking more than 100ms.");
   await sendAndWait(page);
   await pause(page, 4000);
 
-  await typeMessage(page, "Test DNS resolution for 'google.com' — how long does it take and what IPs does it resolve to?");
+  await typeMessage(page, "Check the Redis connection pool — how many connections are active, idle, and what's the pool configuration?");
   await sendAndWait(page);
   await pause(page, 5000);
+  console.log('  → Transition: Logging + Cache Stats');
 }
 
-// ─── Section 6: Comprehensive Debugging ─────────────────────────────────────
-// Cross-cutting scenario that exercises multiple inspectors together
+// ─── Section 5: Logging + Cache Stats ───────────────────────────────────────
 
-async function section6_comprehensive(page) {
-  console.log('  [6/6] Comprehensive Debugging Scenario');
-  await typeMessage(page, "I'm debugging a performance issue. Give me a comprehensive overview: memory and GC status, goroutine count and states, recent HTTP requests with any errors, and system info — all in one summary.");
+async function section5_logging_cache(page) {
+  console.log('  [5/10] Logging + Cache Stats');
+  await typeMessage(page, "Show me the logging configuration — what log level is set and what loggers are configured? Also show recent log entries if available.");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "What's the cache status? Show me cache hit and miss rates, total keys, and memory usage for any in-memory caches.");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "Are there any queue or background job workers running? Show me the queue status and any pending jobs.");
+  await sendAndWait(page);
+  await pause(page, 5000);
+  console.log('  → Transition: Security (auth config, sessions)');
+}
+
+// ─── Section 6: Security (auth config, sessions) ────────────────────────────
+
+async function section6_security(page) {
+  console.log('  [6/10] Security (auth config, sessions)');
+  await typeMessage(page, "I'm doing a security audit. What authentication configuration is in place? Show me the auth middleware and any JWT or session settings.");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "Are there any active sessions? Show me session details — how many are active and when they expire.");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "Check for any potential security issues — are there any environment variables exposing secrets, or any insecure configurations?");
+  await sendAndWait(page);
+  await pause(page, 5000);
+  console.log('  → Transition: Health Checks (DB, Redis, disk)');
+}
+
+// ─── Section 7: Health Checks (DB, Redis, disk) ─────────────────────────────
+
+async function section7_health(page) {
+  console.log('  [7/10] Health Checks (DB, Redis, disk)');
+  await typeMessage(page, "Run a health check on the database connection — is it reachable and responding quickly?");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "Check the health of the Redis connection and also show me disk usage — how much space is free?");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "Give me an overall readiness summary — are all the critical dependencies (database, Redis, disk) healthy?");
+  await sendAndWait(page);
+  await pause(page, 5000);
+  console.log('  → Transition: Scheduler + Error Tracking');
+}
+
+// ─── Section 8: Scheduler + Error Tracking ──────────────────────────────────
+
+async function section8_scheduler_errors(page) {
+  console.log('  [8/10] Scheduler + Error Tracking');
+  await typeMessage(page, "Are there any scheduled or cron jobs running? Show me the scheduler status and upcoming job executions.");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "Show me recent errors tracked by the application — any panics, recovered errors, or error-level log entries?");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "Are there any WebSocket connections active? Show me connection details and any connection errors.");
+  await sendAndWait(page);
+  await pause(page, 5000);
+  console.log('  → Transition: Outbound HTTP + FD + Metrics');
+}
+
+// ─── Section 9: Outbound HTTP + File Descriptors + Metrics ──────────────────
+
+async function section9_outbound_metrics(page) {
+  console.log('  [9/10] Outbound HTTP + File Descriptors + Metrics');
+  await typeMessage(page, "What outbound HTTP requests has the application made recently? Show me the external API calls with response times.");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "How many file descriptors are currently open? Is there any risk of hitting the FD limit?");
+  await sendAndWait(page);
+  await pause(page, 4000);
+
+  await typeMessage(page, "Show me the application metrics — request counts, error rates, latency histograms, and any custom metrics that have been registered.");
+  await sendAndWait(page);
+  await pause(page, 5000);
+  console.log('  → Transition: Comprehensive Multi-Tool Debugging');
+}
+
+// ─── Section 10: Comprehensive Multi-Tool Debugging ─────────────────────────
+
+async function section10_comprehensive(page) {
+  console.log('  [10/10] Comprehensive Multi-Tool Debugging');
+  await typeMessage(page, "I'm investigating a production incident. Give me a comprehensive overview: memory and GC status, goroutine count and states, recent HTTP requests with any errors, database and Redis pool health, and any recent errors — all in one summary.");
   await sendAndWait(page);
   await pause(page, 6000);
 
@@ -171,8 +253,8 @@ async function section6_comprehensive(page) {
 (async () => {
   console.log(`
 ╔══════════════════════════════════════════════════════════════╗
-║  Go Debug Agent — Demo Recording                              ║
-║  25 tools / 8 inspectors                                       ║
+║  Go Debug Agent v0.5.0 — Demo Recording                        ║
+║  65 tools / 18 inspectors                                       ║
 ╚══════════════════════════════════════════════════════════════╝
   `);
 
@@ -216,12 +298,16 @@ async function section6_comprehensive(page) {
   await pause(page, 1000);
 
   const sections = [
-    { name: '01-runtime', fn: section1_runtime },
+    { name: '01-runtime-memory-gc', fn: section1_runtime },
     { name: '02-goroutines-build', fn: section2_goroutines_build },
-    { name: '03-http', fn: section3_http },
-    { name: '04-system', fn: section4_system },
-    { name: '05-network', fn: section5_network },
-    { name: '06-comprehensive', fn: section6_comprehensive },
+    { name: '03-http-routes', fn: section3_http_routes },
+    { name: '04-db-redis', fn: section4_db_redis },
+    { name: '05-logging-cache', fn: section5_logging_cache },
+    { name: '06-security', fn: section6_security },
+    { name: '07-health-checks', fn: section7_health },
+    { name: '08-scheduler-errors', fn: section8_scheduler_errors },
+    { name: '09-outbound-fd-metrics', fn: section9_outbound_metrics },
+    { name: '10-comprehensive', fn: section10_comprehensive },
   ];
 
   const startTime = Date.now();
