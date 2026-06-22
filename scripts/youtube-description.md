@@ -80,7 +80,7 @@ Open `http://localhost:8080/agent` and start chatting with your app.
 
 ### GitHub
 
-https://github.com/topcheer/go-debug-agent
+github.com/topcheer/go-debug-agent
 
 ### Tags
 
