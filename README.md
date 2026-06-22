@@ -1,10 +1,25 @@
 # Go Debug Agent
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/topcheer/go-debug-agent.svg)](https://pkg.go.dev/github.com/topcheer/go-debug-agent)
-![Tools](https://img.shields.io/badge/tools-51-blue)
-![Inspectors](https://img.shields.io/badge/inspectors-19-green)
+![Tools](https://img.shields.io/badge/tools-65-blue)
+![Inspectors](https://img.shields.io/badge/inspectors-24-green)
+![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8)
+![go.mod](https://img.shields.io/badge/go.mod-v1.21-informational)
 
 An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, Redis, GORM models, Gin routes, pprof profiles, build info, HTTP requests, and more — **51 diagnostic tools across 19 inspectors**.
+
+## Version Support
+
+| Go Version | Status |
+|------------|--------|
+| 1.21       | Minimum supported |
+| 1.22       | Supported |
+| 1.23       | Supported |
+| 1.24       | Supported |
+| 1.25       | Supported |
+| 1.26       | Tested |
+
+> Requires `log/slog` (introduced in Go 1.21). No experimental features used.
 
 ## Quick Start
 
