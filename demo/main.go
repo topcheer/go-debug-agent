@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -37,6 +38,104 @@ type OrderInput struct {
 	Product  string  `json:"product" binding:"required"`
 	Quantity int     `json:"quantity"`
 	Price    float64 `json:"price"`
+}
+
+// ─── App config for config inspector ─────────────────────────────────────────
+
+type AppConfig struct {
+	AppName  string            `json:"app_name"`
+	Port     int               `json:"port"`
+	DBPath   string            `json:"db_path"`
+	RedisURL string            `json:"redis_url"`
+	APIKeys  map[string]string `json:"api_keys"`
+}
+
+// ─── Migration tracker ──────────────────────────────────────────────────────
+
+type Migration struct {
+	Version     string
+	Description string
+	SQL         string
+}
+
+// allMigrations defines the ordered list of available migrations.
+var allMigrations = []Migration{
+	{Version: "001", Description: "create_orders_table", SQL: `CREATE TABLE IF NOT EXISTS orders (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		customer TEXT NOT NULL,
+		product TEXT NOT NULL,
+		quantity INTEGER DEFAULT 0,
+		price REAL DEFAULT 0,
+		status TEXT DEFAULT 'pending',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);`},
+	{Version: "002", Description: "add_index_orders_customer", SQL: `CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer);`},
+	{Version: "003", Description: "add_index_orders_status", SQL: `CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);`},
+}
+
+// runMigrations executes pending migrations and returns the status for inspection.
+func runMigrations(db *sql.DB) agent.MigrationStatus {
+	// Ensure migrations table exists
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS migrations (
+		version TEXT PRIMARY KEY,
+		description TEXT,
+		applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);`)
+
+	applied := []string{}
+	pending := []string{}
+	history := []agent.MigrationRecord{}
+
+	for _, m := range allMigrations {
+		var existingVersion string
+		err := db.QueryRow("SELECT version FROM migrations WHERE version = ?", m.Version).Scan(&existingVersion)
+		if err == nil {
+			// Already applied
+			var appliedAt string
+			db.QueryRow("SELECT applied_at FROM migrations WHERE version = ?", m.Version).Scan(&appliedAt)
+			applied = append(applied, m.Version+":"+m.Description)
+			history = append(history, agent.MigrationRecord{
+				Version:   m.Version,
+				AppliedAt: appliedAt,
+				Duration:  "0s",
+			})
+		} else {
+			// Pending — apply it
+			start := time.Now()
+			_, err := db.Exec(m.SQL)
+			elapsed := time.Since(start)
+			if err != nil {
+				log.Printf("[MIGRATION] Failed to apply %s: %v", m.Version, err)
+				pending = append(pending, m.Version+":"+m.Description)
+				continue
+			}
+			_, err = db.Exec("INSERT INTO migrations (version, description) VALUES (?, ?)", m.Version, m.Description)
+			if err != nil {
+				log.Printf("[MIGRATION] Failed to record %s: %v", m.Version, err)
+				pending = append(pending, m.Version+":"+m.Description)
+				continue
+			}
+			applied = append(applied, m.Version+":"+m.Description)
+			history = append(history, agent.MigrationRecord{
+				Version:   m.Version,
+				AppliedAt: time.Now().Format(time.RFC3339),
+				Duration:  elapsed.String(),
+			})
+			log.Printf("[MIGRATION] Applied %s:%s (%s)", m.Version, m.Description, elapsed)
+		}
+	}
+
+	current := "none"
+	if len(applied) > 0 {
+		current = applied[len(applied)-1]
+	}
+
+	return agent.MigrationStatus{
+		Current: current,
+		Applied: applied,
+		Pending: pending,
+		History: history,
+	}
 }
 
 // ─── Auth config for security inspector ─────────────────────────────────────
@@ -101,6 +200,10 @@ var wsUpgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+// ─── Order mutex (for mutex inspection demo) ─────────────────────────────────
+
+var orderMu sync.Mutex
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
@@ -252,6 +355,62 @@ func main() {
 	agent.RegisterGormDB("default", db)
 	agent.RegisterGormModels("default", &Order{})
 
+	// ── v0.6.0: Enable mutex profiling for lock contention inspection ──
+	runtime.SetMutexProfileFraction(1)
+
+	// ── v0.6.0: Get raw *sql.DB and register for pool inspection ──
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Printf("[WARN] Failed to get *sql.DB: %v", err)
+	} else {
+		sqlDB.SetMaxOpenConns(10)
+		sqlDB.SetMaxIdleConns(5)
+		agent.RegisterDatabase("default", sqlDB)
+	}
+
+	// ── v0.6.0: Run migrations and register migration status ──
+	if sqlDB != nil {
+		migrationStatus := runMigrations(sqlDB)
+		agent.RegisterMigrationStatus(func() agent.MigrationStatus {
+			return runMigrations(sqlDB)
+		})
+		log.Printf("[MIGRATION] Current version: %s, applied: %d, pending: %d",
+			migrationStatus.Current, len(migrationStatus.Applied), len(migrationStatus.Pending))
+	}
+
+	// ── v0.6.0: Register app config for config inspection ──
+	appConfig := AppConfig{
+		AppName:  "Order Management API",
+		Port:     8080,
+		DBPath:   "orders.db",
+		RedisURL: redisURL,
+		APIKeys: map[string]string{
+			"api_key":   "sk-production-key-12345",
+			"admin_key": "admin-secret-token-67890",
+		},
+	}
+	agent.RegisterConfig("app", appConfig)
+
+	// ── v0.6.0: Register feature flags ──
+	agent.RegisterFeatureFlag("new_order_ui", agent.FeatureFlag{
+		Enabled: true,
+		Variant: "v2",
+		Reason:  "rolled_out_to_all_users",
+	})
+	agent.RegisterFeatureFlag("experimental_cache", agent.FeatureFlag{
+		Enabled: false,
+		Variant: "",
+		Reason:  "in_development",
+	})
+	agent.RegisterFeatureFlag("ai_recommendations", agent.FeatureFlag{
+		Enabled: true,
+		Variant: "model_a",
+		Reason:  "enabled_for_production",
+	})
+
+	// ── v0.6.0: Register order mutex for lock inspection ──
+	agent.RegisterMutex("order_creation", &orderMu)
+
 	// ── API key auth middleware ──
 	apiKeyAuth := func(c *gin.Context) {
 		key := c.GetHeader(authCfg.APIKeyName)
@@ -302,6 +461,10 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		// Use registered mutex for order creation (demonstrates lock inspection)
+		orderMu.Lock()
+		defer orderMu.Unlock()
+
 		order := Order{
 			Customer:  in.Customer,
 			Product:   in.Product,
@@ -461,9 +624,9 @@ func main() {
 
 	// ── Startup banner ──
 	fmt.Println()
-	fmt.Println("  ┌──────────────────────────────────────────────────────────────┐")
-	fmt.Println("  │   Go Debug Agent v0.5.0 — Order Management (Gin+Redis+GORM) │")
-	fmt.Println("  └──────────────────────────────────────────────────────────────┘")
+	fmt.Println("  ┌──────────────────────────────────────────────────────────────────┐")
+	fmt.Println("  │   Go Debug Agent v0.6.0 — Order Management (Gin+Redis+GORM)     │")
+	fmt.Println("  └──────────────────────────────────────────────────────────────────┘")
 	fmt.Println()
 	fmt.Println("  API Endpoints:")
 	fmt.Println("    GET    /api/orders       — List all orders")
@@ -486,12 +649,13 @@ func main() {
 	fmt.Println("  Debug Agent:")
 	fmt.Println("    http://localhost:8080/agent")
 	fmt.Println()
-	fmt.Println("  v0.5.0 New Inspectors:")
-	fmt.Println("    - Security  (get_auth_config, get_active_sessions, get_password_policy)")
-	fmt.Println("    - Health    (get_health_status, get_health_detail, run_health_check)")
-	fmt.Println("    - Scheduler (get_scheduled_jobs, get_job_history)")
-	fmt.Println("    - Errors    (get_recent_errors, get_error_stats, get_error_patterns)")
-	fmt.Println("    - WebSocket (get_ws_connections, get_ws_stats, get_ws_rooms)")
+	fmt.Println("  v0.6.0 New Inspectors:")
+	fmt.Println("    - Locks     (get_lock_contention, get_block_profile, detect_deadlock, get_mutex_holders)")
+	fmt.Println("    - Migration (get_migration_status, get_pending_migrations, get_migration_history)")
+	fmt.Println("    - Config    (get_config_snapshot, get_env_vars, get_config_diff)")
+	fmt.Println("    - Flags     (get_feature_flags, evaluate_flag)")
+	fmt.Println("    - Endpoint  (test_endpoint, batch_test_endpoints, get_endpoint_coverage)")
+	fmt.Println("    - Pool      (get_pool_details, detect_pool_leaks, get_pool_wait_stats)")
 	fmt.Println()
 
 	var orderCount int64

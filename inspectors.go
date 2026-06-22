@@ -31,4 +31,12 @@ func initInspectors() {
 	registerSchedulerInspector()
 	registerErrorInspector()
 	registerWebSocketInspector()
+
+	// v0.6.0 inspectors
+	registerLocksInspector()
+	registerMigrationInspector()
+	registerConfigInspector()
+	registerFeatureFlagInspector()
+	registerEndpointTestInspector()
+	registerPoolInspector()
 }

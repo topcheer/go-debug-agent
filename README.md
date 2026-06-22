@@ -1,12 +1,12 @@
 # Go Debug Agent
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/topcheer/go-debug-agent.svg)](https://pkg.go.dev/github.com/topcheer/go-debug-agent)
-![Tools](https://img.shields.io/badge/tools-65-blue)
-![Inspectors](https://img.shields.io/badge/inspectors-24-green)
+![Tools](https://img.shields.io/badge/tools-83-blue)
+![Inspectors](https://img.shields.io/badge/inspectors-30-green)
 ![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8)
 ![go.mod](https://img.shields.io/badge/go.mod-v1.21-informational)
 
-An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, Redis, GORM models, Gin routes, pprof profiles, build info, HTTP requests, and more — **51 diagnostic tools across 19 inspectors**.
+An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, Redis, GORM models, Gin routes, pprof profiles, build info, HTTP requests, locks & deadlocks, migrations, config, feature flags, endpoint coverage, connection pools, and more — **83 diagnostic tools across 30 inspectors**.
 
 ## Version Support
 
@@ -68,10 +68,10 @@ http://localhost:8080/agent
 - **Context compression** — automatically summarizes old conversation when token limit is approached
 - **Dark-themed chat UI** with full markdown rendering (tables, code blocks, lists)
 - **Max tool rounds** (25) with forced final summary when limit is reached
-- **51 diagnostic tools** across **19 inspectors**
+- **82 diagnostic tools** across **30 inspectors**
 - Zero external dependencies (no Datadog, no Grafana, no APM)
 
-## Inspectors & Tools (51)
+## Inspectors & Tools (83)
 
 ### Runtime Inspector
 | Tool | Description |
@@ -194,6 +194,48 @@ http://localhost:8080/agent
 | Tool | Description |
 |------|-------------|
 | `get_wait_groups` | List registered sync.WaitGroup states (counter, waiter count) |
+
+### Locks & Deadlock Inspector (v0.6.0)
+| Tool | Description |
+|------|-------------|
+| `get_lock_contention` | Mutex/RWMutex contention stats from pprof mutex profile |
+| `get_block_profile` | Goroutine blocking profile (channels, mutexes, WaitGroups) |
+| `detect_deadlock` | Analyze all goroutines for deadlock patterns (circular wait) |
+| `get_mutex_holders` | List which goroutines hold which registered mutexes |
+
+### Migration Inspector (v0.6.0)
+| Tool | Description |
+|------|-------------|
+| `get_migration_status` | Current schema version, applied count, last migration |
+| `get_pending_migrations` | Migrations not yet applied (version, description) |
+| `get_migration_history` | Applied migration history (version, applied_at, duration) |
+
+### Configuration Inspector (v0.6.0)
+| Tool | Description |
+|------|-------------|
+| `get_config_snapshot` | All registered config values (sensitive keys masked) |
+| `get_env_vars` | Process environment variables with prefix filter |
+| `get_config_diff` | Compare registered defaults vs actual values |
+
+### Feature Flags Inspector (v0.6.0)
+| Tool | Description |
+|------|-------------|
+| `get_feature_flags` | List all registered feature flags with current state |
+| `evaluate_flag` | Evaluate a specific flag for a context/user |
+
+### Endpoint Testing Inspector (v0.6.0)
+| Tool | Description |
+|------|-------------|
+| `test_endpoint` | Make an HTTP request to own app, return full response |
+| `batch_test_endpoints` | Test multiple endpoints in one call |
+| `get_endpoint_coverage` | Compare registered routes vs tested endpoints |
+
+### Connection Pool Inspector (v0.6.0)
+| Tool | Description |
+|------|-------------|
+| `get_pool_details` | Detailed DB pool stats (MaxOpen, InUse, Idle, WaitCount) |
+| `detect_pool_leaks` | Heuristic leak detection (high wait ratio, saturation) |
+| `get_pool_wait_stats` | Connection acquire wait stats (avg, P95, max, timeout) |
 
 ## Custom Tools
 
