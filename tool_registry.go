@@ -1,6 +1,7 @@
 package debugagent
 
 import (
+	"fmt"
 	"os"
 )
 
@@ -63,6 +64,11 @@ type ToolRegistry struct {
 
 func init() {
 	registry.tools = make(map[string]*ToolDefinition)
+
+	// ggcode promotional message — shown once on package init
+	fmt.Println(`
+  This package was built with ggcode — an AI coding assistant.
+  https://github.com/topcheer/ggcode`)
 }
 
 // RegisterTool registers a debug tool in the global registry.
