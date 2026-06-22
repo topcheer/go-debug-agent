@@ -1,263 +1,314 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
-	"sync"
+	"os"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	agent "github.com/ggcode/debugagent"
 )
 
-// ─── Order model ──────────────────────────────────────────────────────────
+// ─── GORM model ─────────────────────────────────────────────────────────────
 
 type Order struct {
-	ID       int     `json:"id"`
-	Customer string  `json:"customer"`
-	Item     string  `json:"item"`
-	Quantity int     `json:"quantity"`
-	Price    float64 `json:"price"`
-	Total    float64 `json:"total"`
-	Status   string  `json:"status"`
-	Created  string  `json:"created_at"`
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	Customer  string    `json:"customer" gorm:"not null"`
+	Product   string    `json:"product" gorm:"not null"`
+	Quantity  int       `json:"quantity"`
+	Price     float64   `json:"price"`
+	Status    string    `json:"status" gorm:"default:'pending'"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type OrderInput struct {
-	Customer string  `json:"customer"`
-	Item     string  `json:"item"`
+	Customer string  `json:"customer" binding:"required"`
+	Product  string  `json:"product" binding:"required"`
 	Quantity int     `json:"quantity"`
 	Price    float64 `json:"price"`
 }
 
-// ─── Thread-safe in-memory store ──────────────────────────────────────────
-
-type OrderStore struct {
-	mu     sync.Mutex
-	orders map[int]*Order
-	nextID int
-}
-
-func NewOrderStore() *OrderStore {
-	s := &OrderStore{
-		orders: make(map[int]*Order),
-		nextID: 1,
-	}
-	s.seed()
-	return s
-}
-
-func (s *OrderStore) seed() {
-	samples := []OrderInput{
-		{Customer: "Alice", Item: "Laptop", Quantity: 2, Price: 1299.99},
-		{Customer: "Bob", Item: "Wireless Mouse", Quantity: 5, Price: 29.99},
-		{Customer: "Charlie", Item: "USB-C Hub", Quantity: 3, Price: 49.99},
-	}
-	for _, in := range samples {
-		s.create(in)
-	}
-}
-
-func (s *OrderStore) create(in OrderInput) *Order {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	id := s.nextID
-	s.nextID++
-	o := &Order{
-		ID:       id,
-		Customer: in.Customer,
-		Item:     in.Item,
-		Quantity: in.Quantity,
-		Price:    in.Price,
-		Total:    float64(in.Quantity) * in.Price,
-		Status:   "pending",
-		Created:  time.Now().Format(time.RFC3339),
-	}
-	s.orders[id] = o
-	return o
-}
-
-func (s *OrderStore) get(id int) (*Order, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	o, ok := s.orders[id]
-	return o, ok
-}
-
-func (s *OrderStore) list() []*Order {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	list := make([]*Order, 0, len(s.orders))
-	for _, o := range s.orders {
-		list = append(list, o)
-	}
-	return list
-}
-
-func (s *OrderStore) delete(id int) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.orders[id]; !ok {
-		return false
-	}
-	delete(s.orders, id)
-	return true
-}
-
-func (s *OrderStore) count() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.orders)
-}
-
-// ─── HTTP response writer wrapper ──────────────────────────────────────────
-
-type statusWriter struct {
-	http.ResponseWriter
-	status int
-}
-
-func (w *statusWriter) WriteHeader(code int) {
-	w.status = code
-	w.ResponseWriter.WriteHeader(code)
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-// ─── Main ──────────────────────────────────────────────────────────────────
+// ─── Main ───────────────────────────────────────────────────────────────────
 
 func main() {
-	store := NewOrderStore()
-
-	mux := http.NewServeMux()
-
-	// ── CRUD endpoints ──
-	mux.HandleFunc("/api/orders", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			orders := store.list()
-			log.Printf("[API] GET /api/orders — returning %d orders", len(orders))
-			writeJSON(w, http.StatusOK, orders)
-
-		case http.MethodPost:
-			var in OrderInput
-			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-				log.Printf("[API] POST /api/orders — bad request: %v", err)
-				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON body"})
-				return
-			}
-			if in.Customer == "" || in.Item == "" {
-				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "customer and item are required"})
-				return
-			}
-			o := store.create(in)
-			log.Printf("[API] POST /api/orders — created order #%d for %s", o.ID, o.Customer)
-			writeJSON(w, http.StatusCreated, o)
-
-		default:
-			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
-		}
+	// ── Connect to Redis ──
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     redisURL,
+		Password: "",
+		DB:       0,
 	})
 
-	mux.HandleFunc("/api/orders/", func(w http.ResponseWriter, r *http.Request) {
-		idStr := r.URL.Path[len("/api/orders/"):]
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid order ID"})
-			return
-		}
-		switch r.Method {
-		case http.MethodGet:
-			o, ok := store.get(id)
-			if !ok {
-				log.Printf("[API] GET /api/orders/%d — not found", id)
-				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Order not found"})
-				return
-			}
-			log.Printf("[API] GET /api/orders/%d — found", id)
-			writeJSON(w, http.StatusOK, o)
+	// Test Redis connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Printf("[WARN] Redis connection failed (cache will be disabled): %v", err)
+	} else {
+		log.Printf("[INFO] Connected to Redis at %s", redisURL)
+	}
+	cancel()
 
-		case http.MethodDelete:
-			if !store.delete(id) {
-				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Order not found"})
-				return
-			}
-			log.Printf("[API] DELETE /api/orders/%d — deleted", id)
-			writeJSON(w, http.StatusOK, map[string]any{"deleted": id})
+	// ── Connect to SQLite via GORM ──
+	db, err := gorm.Open(sqlite.Open("orders.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
 
-		default:
-			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
-		}
-	})
+	// Auto-migrate
+	if err := db.AutoMigrate(&Order{}); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
 
-	// ── Health check ──
-	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"status":   "UP",
-			"orders":   store.count(),
-			"uptime_s": int(time.Since(time.Now()).Seconds()),
-		})
-	})
+	// Seed sample data if empty
+	seedOrders(db)
 
-	// ── Slow endpoint (simulates latency for request tracking demos) ──
-	mux.HandleFunc("/api/slow", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[API] GET /api/slow — sleeping 500ms")
-		time.Sleep(500 * time.Millisecond)
-		writeJSON(w, http.StatusOK, map[string]string{"message": "This response was intentionally slow (500ms)"})
-	})
+	// ── Gin router ──
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(gin.Logger(), gin.Recovery())
 
-	// ── Error endpoint (always returns 500) ──
-	mux.HandleFunc("/api/error", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[API] GET /api/error — returning 500")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Intentional server error for testing"})
-	})
-
-	// ── Debug Agent: mount at /agent ──
-	mux.Handle("/agent", agent.Middleware(nil))
-	mux.Handle("/agent/", agent.Middleware(nil))
-
-	// ── Wrap everything with request tracking middleware ──
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Custom middleware to record HTTP requests for the debug agent
+	router.Use(func(c *gin.Context) {
 		start := time.Now()
-		wrapped := &statusWriter{ResponseWriter: w, status: 200}
-		mux.ServeHTTP(wrapped, r)
+		c.Next()
 		agent.RecordHTTPRequest(
-			r.Method,
-			r.URL.Path,
-			wrapped.status,
+			c.Request.Method,
+			c.Request.URL.Path,
+			c.Writer.Status(),
 			float64(time.Since(start).Microseconds())/1000.0,
-			r.RemoteAddr,
+			c.ClientIP(),
 		)
 	})
 
+	// ── Register framework instances for inspection ──
+	agent.RegisterGinEngine(router)
+	agent.RegisterRedisClient("default", rdb)
+	agent.RegisterGormDB("default", db)
+	agent.RegisterGormModels("default", &Order{})
+
+	// ── API routes ──
+
+	// GET /api/orders — list all orders
+	router.GET("/api/orders", func(c *gin.Context) {
+		var orders []Order
+		if err := db.Find(&orders).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		log.Printf("[API] GET /api/orders — returning %d orders", len(orders))
+		c.JSON(http.StatusOK, orders)
+	})
+
+	// POST /api/orders — create a new order
+	router.POST("/api/orders", func(c *gin.Context) {
+		var in OrderInput
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		order := Order{
+			Customer:  in.Customer,
+			Product:   in.Product,
+			Quantity:  in.Quantity,
+			Price:     in.Price,
+			Status:    "pending",
+			CreatedAt: time.Now(),
+		}
+		if err := db.Create(&order).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		// Invalidate cache
+		rdb.Del(context.Background(), fmt.Sprintf("order:%d", order.ID))
+		log.Printf("[API] POST /api/orders — created order #%d for %s", order.ID, order.Customer)
+		c.JSON(http.StatusCreated, order)
+	})
+
+	// GET /api/orders/:id — get order by ID (with Redis cache)
+	router.GET("/api/orders/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		cacheKey := fmt.Sprintf("order:%s", id)
+
+		// Try Redis cache first
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if cached, err := rdb.Get(ctx, cacheKey).Result(); err == nil {
+			log.Printf("[API] GET /api/orders/%s — cache HIT", id)
+			c.Data(http.StatusOK, "application/json", []byte(cached))
+			return
+		}
+
+		// Cache miss — query database
+		var order Order
+		if err := db.First(&order, "id = ?", id).Error; err != nil {
+			log.Printf("[API] GET /api/orders/%s — not found", id)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+			return
+		}
+
+		// Cache the result with 60s TTL
+		log.Printf("[API] GET /api/orders/%s — cache MISS, querying DB", id)
+		if data, err := json.Marshal(order); err == nil {
+			rdb.Set(context.Background(), cacheKey, string(data), 60*time.Second)
+		}
+
+		c.JSON(http.StatusOK, order)
+	})
+
+	// PUT /api/orders/:id — update an order
+	router.PUT("/api/orders/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var order Order
+		if err := db.First(&order, "id = ?", id).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+			return
+		}
+		var in OrderInput
+		if err := c.ShouldBindJSON(&in); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		order.Customer = in.Customer
+		order.Product = in.Product
+		order.Quantity = in.Quantity
+		order.Price = in.Price
+		if err := db.Save(&order).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		// Invalidate cache
+		rdb.Del(context.Background(), fmt.Sprintf("order:%s", id))
+		log.Printf("[API] PUT /api/orders/%s — updated", id)
+		c.JSON(http.StatusOK, order)
+	})
+
+	// DELETE /api/orders/:id — delete an order
+	router.DELETE("/api/orders/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		result := db.Delete(&Order{}, "id = ?", id)
+		if result.RowsAffected == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+			return
+		}
+		// Invalidate cache
+		rdb.Del(context.Background(), fmt.Sprintf("order:%s", id))
+		log.Printf("[API] DELETE /api/orders/%s — deleted", id)
+		c.JSON(http.StatusOK, gin.H{"deleted": id})
+	})
+
+	// GET /api/health — health check
+	router.GET("/api/health", func(c *gin.Context) {
+		var count int64
+		db.Model(&Order{}).Count(&count)
+		c.JSON(http.StatusOK, gin.H{
+			"status":   "UP",
+			"orders":   count,
+			"uptime_s": int(time.Since(startTime).Seconds()),
+		})
+	})
+
+	// GET /api/slow — slow endpoint (500ms)
+	router.GET("/api/slow", func(c *gin.Context) {
+		log.Printf("[API] GET /api/slow — sleeping 500ms")
+		time.Sleep(500 * time.Millisecond)
+		c.JSON(http.StatusOK, gin.H{"message": "This response was intentionally slow (500ms)"})
+	})
+
+	// GET /api/error — always returns 500
+	router.GET("/api/error", func(c *gin.Context) {
+		log.Printf("[API] GET /api/error — returning 500")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Intentional server error for testing"})
+	})
+
+	// ── Mount debug agent ──
+	agentHandler := agent.Middleware(nil)
+	router.Any("/agent", func(c *gin.Context) {
+		agentHandler.ServeHTTP(c.Writer, c.Request)
+	})
+	router.Any("/agent/*any", func(c *gin.Context) {
+		agentHandler.ServeHTTP(c.Writer, c.Request)
+	})
+
+	// ── Startup banner ──
 	fmt.Println()
-	fmt.Println("  ┌──────────────────────────────────────────────────┐")
-	fmt.Println("  │         Go Debug Agent — Order Management        │")
-	fmt.Println("  └──────────────────────────────────────────────────┘")
+	fmt.Println("  ┌──────────────────────────────────────────────────────────┐")
+	fmt.Println("  │     Go Debug Agent — Order Management (Gin+Redis+GORM)   │")
+	fmt.Println("  └──────────────────────────────────────────────────────────┘")
 	fmt.Println()
 	fmt.Println("  API Endpoints:")
 	fmt.Println("    GET    /api/orders       — List all orders")
 	fmt.Println("    POST   /api/orders       — Create a new order")
-	fmt.Println("    GET    /api/orders/{id}  — Get order by ID")
-	fmt.Println("    DELETE /api/orders/{id}  — Delete order by ID")
+	fmt.Println("    GET    /api/orders/:id   — Get order by ID (Redis cached)")
+	fmt.Println("    PUT    /api/orders/:id   — Update order")
+	fmt.Println("    DELETE /api/orders/:id   — Delete order")
 	fmt.Println("    GET    /api/health       — Health check")
 	fmt.Println("    GET    /api/slow         — Slow endpoint (500ms)")
 	fmt.Println("    GET    /api/error        — Error endpoint (500)")
 	fmt.Println()
+	fmt.Println("  Stack:")
+	fmt.Printf("    Redis:  %s\n", redisURL)
+	fmt.Println("    DB:     SQLite (orders.db)")
+	fmt.Println("    Routes: Gin")
+	fmt.Println()
 	fmt.Println("  Debug Agent:")
 	fmt.Println("    http://localhost:8080/agent")
 	fmt.Println()
-	fmt.Printf("  Seeded %d sample orders.\n", store.count())
+	fmt.Println("  Registered Inspectors:")
+	fmt.Println("    - Gin routes (get_gin_routes)")
+	fmt.Println("    - Redis pool/info/latency (get_redis_*)")
+	fmt.Println("    - GORM stats/models (get_gorm_*)")
+	fmt.Println()
+
+	var orderCount int64
+	db.Model(&Order{}).Count(&orderCount)
+	fmt.Printf("  Seeded %d sample orders.\n", orderCount)
 	fmt.Println()
 	log.Println("Server starting on :8080")
 
-	if err := http.ListenAndServe(":8080", handler); err != nil {
+	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
+}
+
+var startTime = time.Now()
+
+// ─── Seed data ──────────────────────────────────────────────────────────────
+
+func seedOrders(db *gorm.DB) {
+	var count int64
+	db.Model(&Order{}).Count(&count)
+	if count > 0 {
+		return
+	}
+
+	samples := []OrderInput{
+		{Customer: "Alice", Product: "Laptop", Quantity: 2, Price: 1299.99},
+		{Customer: "Bob", Product: "Wireless Mouse", Quantity: 5, Price: 29.99},
+		{Customer: "Charlie", Product: "USB-C Hub", Quantity: 3, Price: 49.99},
+	}
+	for _, s := range samples {
+		order := Order{
+			Customer:  s.Customer,
+			Product:   s.Product,
+			Quantity:  s.Quantity,
+			Price:     s.Price,
+			Status:    "pending",
+			CreatedAt: time.Now(),
+		}
+		if err := db.Create(&order).Error; err != nil {
+			log.Printf("[WARN] Failed to seed order: %v", err)
+		}
+	}
+	log.Printf("[INFO] Seeded %d sample orders", len(samples))
 }

@@ -1,6 +1,10 @@
 # Go Debug Agent
 
-An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, build info, HTTP requests, and more.
+[![Go Reference](https://pkg.go.dev/badge/github.com/topcheer/go-debug-agent.svg)](https://pkg.go.dev/github.com/topcheer/go-debug-agent)
+![Tools](https://img.shields.io/badge/tools-36-blue)
+![Inspectors](https://img.shields.io/badge/inspectors-12-green)
+
+An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, Redis, GORM models, Gin routes, pprof profiles, build info, HTTP requests, and more — **36 diagnostic tools across 12 inspectors**.
 
 ## Quick Start
 
@@ -49,9 +53,10 @@ http://localhost:8080/agent
 - **Context compression** — automatically summarizes old conversation when token limit is approached
 - **Dark-themed chat UI** with full markdown rendering (tables, code blocks, lists)
 - **Max tool rounds** (25) with forced final summary when limit is reached
-- **25 diagnostic tools** across 8 inspectors
+- **36 diagnostic tools** across **12 inspectors**
+- Zero external dependencies (no Datadog, no Grafana, no APM)
 
-## Inspectors & Tools (25)
+## Inspectors & Tools (36)
 
 ### Runtime Inspector
 | Tool | Description |
@@ -71,6 +76,7 @@ http://localhost:8080/agent
 | `get_goroutine_states` | Goroutine state distribution (running, waiting, sleeping) |
 | `get_goroutine_dump` | Full goroutine dump with stack traces |
 | `sample_goroutine_profile` | Sample goroutine profile for a short duration |
+| `get_goroutine_leaks` | Detect potentially leaked goroutines waiting indefinitely |
 
 ### Database Inspector
 | Tool | Description |
@@ -106,6 +112,36 @@ http://localhost:8080/agent
 | `get_disk_usage` | Disk usage for working directory |
 | `get_environment_variables` | Environment variables (masked secrets) |
 
+### Redis Inspector
+| Tool | Description |
+|------|-------------|
+| `get_redis_info` | Redis server info: memory, clients, persistence |
+| `get_redis_keys` | Scan Redis keyspace with pattern matching |
+| `get_redis_client_stats` | Connected clients, slow log, latency |
+
+### Gin Routes Inspector
+| Tool | Description |
+|------|-------------|
+| `get_gin_routes` | List all registered Gin routes with handlers and groups |
+
+### GORM Inspector
+| Tool | Description |
+|------|-------------|
+| `get_gorm_models` | List registered GORM models, table names, field counts |
+| `get_gorm_migrations` | GORM AutoMigrate status and schema version |
+
+### pprof Inspector
+| Tool | Description |
+|------|-------------|
+| `get_pprof_goroutine` | Goroutine profile via runtime/pprof |
+| `get_pprof_heap` | Heap allocation profile |
+| `get_pprof_profile` | CPU profile snapshot for a short duration |
+
+### Context Inspector
+| Tool | Description |
+|------|-------------|
+| `get_context_tree` | Active context.Context tree with cancellation status |
+
 ## Custom Tools
 
 ```go
@@ -127,6 +163,26 @@ agent.RegisterTool("check_redis", "Check Redis connection", func(args map[string
 | `LLM_CONTEXT_WINDOW_TOKENS` | `100000` | Context window size |
 
 ## Run the Demo
+
+The demo uses **Gin** + **GORM/SQLite** + **Redis**. Start Redis with Docker Compose first:
+
+### Docker Compose
+
+```yaml
+# docker-compose.yml
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+```
+
+```bash
+docker compose up -d
+```
+
+### Start the app
 
 ```bash
 export LLM_API_KEY=your-key

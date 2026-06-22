@@ -11,4 +11,8 @@ func initInspectors() {
 	registerBuildInfoInspector()
 	registerAllocInspector()
 	registerNetworkInspector()
+	registerRedisInspector()
+	registerRoutesInspector()
+	registerGormInspector()
+	registerPprofInspector()
 }
