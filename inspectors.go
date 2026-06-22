@@ -39,4 +39,11 @@ func initInspectors() {
 	registerFeatureFlagInspector()
 	registerEndpointTestInspector()
 	registerPoolInspector()
+
+	// v0.7.0 inspectors
+	registerCPUProfileInspector()
+	registerLeakInspector()
+	registerDeploymentInspector()
+	registerSnapshotInspector()
+	registerRegistryInspector()
 }

@@ -1,12 +1,12 @@
 # Go Debug Agent
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/topcheer/go-debug-agent.svg)](https://pkg.go.dev/github.com/topcheer/go-debug-agent)
-![Tools](https://img.shields.io/badge/tools-83-blue)
-![Inspectors](https://img.shields.io/badge/inspectors-30-green)
+![Tools](https://img.shields.io/badge/tools-97-blue)
+![Inspectors](https://img.shields.io/badge/inspectors-35-green)
 ![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8)
 ![go.mod](https://img.shields.io/badge/go.mod-v1.21-informational)
 
-An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, Redis, GORM models, Gin routes, pprof profiles, build info, HTTP requests, locks & deadlocks, migrations, config, feature flags, endpoint coverage, connection pools, and more — **83 diagnostic tools across 30 inspectors**.
+An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, Redis, GORM models, Gin routes, pprof profiles, build info, HTTP requests, locks & deadlocks, migrations, config, feature flags, endpoint coverage, connection pools, and more — **97 diagnostic tools across 35 inspectors**.
 
 ## Version Support
 
@@ -68,10 +68,10 @@ http://localhost:8080/agent
 - **Context compression** — automatically summarizes old conversation when token limit is approached
 - **Dark-themed chat UI** with full markdown rendering (tables, code blocks, lists)
 - **Max tool rounds** (25) with forced final summary when limit is reached
-- **82 diagnostic tools** across **30 inspectors**
+- **97 diagnostic tools** across **35 inspectors**
 - Zero external dependencies (no Datadog, no Grafana, no APM)
 
-## Inspectors & Tools (83)
+## Inspectors & Tools (97)
 
 ### Runtime Inspector
 | Tool | Description |
@@ -236,6 +236,40 @@ http://localhost:8080/agent
 | `get_pool_details` | Detailed DB pool stats (MaxOpen, InUse, Idle, WaitCount) |
 | `detect_pool_leaks` | Heuristic leak detection (high wait ratio, saturation) |
 | `get_pool_wait_stats` | Connection acquire wait stats (avg, P95, max, timeout) |
+
+### CPU Profiler Inspector (v0.7.0)
+| Tool | Description |
+|------|-------------|
+| `start_cpu_profile` | Start a CPU profiling session |
+| `stop_cpu_profile` | Stop CPU profiling and return collected profile data |
+| `get_top_functions` | Get top CPU-consuming functions from the current profile |
+
+### Memory Leak Detector Inspector (v0.7.0)
+| Tool | Description |
+|------|-------------|
+| `take_heap_snapshot` | Capture a heap snapshot for leak analysis |
+| `compare_heap_snapshots` | Compare two heap snapshots to identify object growth |
+| `get_leak_candidates` | Identify objects likely to be memory leaks |
+
+### Deployment/Build Info Inspector (v0.7.0)
+| Tool | Description |
+|------|-------------|
+| `get_build_info` | Build version, commit hash, and compilation settings |
+| `get_deployment_info` | Deployment environment, container, and orchestration metadata |
+| `get_runtime_version` | Runtime version, compiler, and platform details |
+
+### Snapshot & Diff Inspector (v0.7.0)
+| Tool | Description |
+|------|-------------|
+| `take_snapshot` | Capture a runtime state snapshot |
+| `compare_snapshots` | Compare two snapshots to identify state changes |
+| `list_snapshots` | List all saved snapshots with timestamps |
+
+### Service Registry Inspector (v0.7.0)
+| Tool | Description |
+|------|-------------|
+| `get_registered_services` | List all registered application services |
+| `get_service_dependencies` | Map service-to-service dependency graph |
 
 ## Custom Tools
 
