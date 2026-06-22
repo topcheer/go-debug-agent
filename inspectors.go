@@ -15,4 +15,13 @@ func initInspectors() {
 	registerRoutesInspector()
 	registerGormInspector()
 	registerPprofInspector()
+
+	// v0.4.0 inspectors
+	registerLoggingInspector()
+	registerCacheInspector()
+	registerHttpClientInspector()
+	registerFdInspector()
+	registerMetricsInspector()
+	registerContextInspector()
+	registerSyncInspector()
 }

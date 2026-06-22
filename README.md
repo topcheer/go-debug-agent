@@ -1,10 +1,10 @@
 # Go Debug Agent
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/topcheer/go-debug-agent.svg)](https://pkg.go.dev/github.com/topcheer/go-debug-agent)
-![Tools](https://img.shields.io/badge/tools-36-blue)
-![Inspectors](https://img.shields.io/badge/inspectors-12-green)
+![Tools](https://img.shields.io/badge/tools-51-blue)
+![Inspectors](https://img.shields.io/badge/inspectors-19-green)
 
-An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, Redis, GORM models, Gin routes, pprof profiles, build info, HTTP requests, and more — **36 diagnostic tools across 12 inspectors**.
+An AI-powered runtime debugging agent that embeds directly into your Go application. Add one import, configure an LLM key, and chat with your live app at `/agent` to inspect goroutines, memory, GC, database connections, Redis, GORM models, Gin routes, pprof profiles, build info, HTTP requests, and more — **51 diagnostic tools across 19 inspectors**.
 
 ## Quick Start
 
@@ -53,10 +53,10 @@ http://localhost:8080/agent
 - **Context compression** — automatically summarizes old conversation when token limit is approached
 - **Dark-themed chat UI** with full markdown rendering (tables, code blocks, lists)
 - **Max tool rounds** (25) with forced final summary when limit is reached
-- **36 diagnostic tools** across **12 inspectors**
+- **51 diagnostic tools** across **19 inspectors**
 - Zero external dependencies (no Datadog, no Grafana, no APM)
 
-## Inspectors & Tools (36)
+## Inspectors & Tools (51)
 
 ### Runtime Inspector
 | Tool | Description |
@@ -141,6 +141,44 @@ http://localhost:8080/agent
 | Tool | Description |
 |------|-------------|
 | `get_context_tree` | Active context.Context tree with cancellation status |
+
+### Logging Inspector
+| Tool | Description |
+|------|-------------|
+| `get_log_buffer` | Recent log entries from the built-in ring buffer (filter by level/source) |
+| `get_log_level` | Current log level for all registered loggers (slog, zap, zerolog) |
+| `set_log_level` | Dynamically set the log level for a registered logger |
+| `register_logger` | Register a logger for runtime inspection |
+
+### Cache Inspector
+| Tool | Description |
+|------|-------------|
+| `get_cache_stats` | Stats for registered caches (hit rate, miss count, key count) |
+| `get_cache_keys` | List keys in a registered cache with optional prefix filter |
+| `clear_cache` | Clear all entries from a registered cache |
+
+### Outbound HTTP Inspector
+| Tool | Description |
+|------|-------------|
+| `get_http_transport_stats` | http.Transport pool stats (MaxIdleConns, idle connections per host) |
+| `get_outbound_summary` | Aggregated outbound HTTP call stats (total, avg latency, error rate, top hosts) |
+
+### File Descriptor Inspector
+| Tool | Description |
+|------|-------------|
+| `get_fd_count` | Current number of open file descriptors |
+| `get_fd_limit` | File descriptor soft and hard limits (RLIMIT_NOFILE) |
+
+### Metrics Inspector
+| Tool | Description |
+|------|-------------|
+| `get_registered_metrics` | List all registered Prometheus metrics (name, type, help, sample count) |
+| `get_metric_value` | Get current value of a specific metric by name |
+
+### Wait Groups Inspector
+| Tool | Description |
+|------|-------------|
+| `get_wait_groups` | List registered sync.WaitGroup states (counter, waiter count) |
 
 ## Custom Tools
 
