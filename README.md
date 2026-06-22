@@ -285,6 +285,12 @@ cd demo && go run main.go
 # Open http://localhost:8080/agent
 ```
 
+## Built With
+
+[![ggcode](https://img.shields.io/badge/built%20with-ggcode-blue)](https://github.com/topcheer/ggcode)
+
+This project was built using [ggcode](https://github.com/topcheer/ggcode) — an AI coding assistant for terminal-based development.
+
 ## License
 
 MIT
