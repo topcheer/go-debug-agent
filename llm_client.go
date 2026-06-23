@@ -19,9 +19,17 @@ type LLMClient struct {
 }
 
 func NewLLMClient(cfg LLMConfig) *LLMClient {
+	transport := &http.Transport{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 8,
+		IdleConnTimeout:     90 * time.Second,
+	}
 	return &LLMClient{
 		cfg:    cfg,
-		client: &http.Client{Timeout: time.Duration(cfg.TimeoutSeconds) * time.Second},
+		client: &http.Client{
+			Timeout:   time.Duration(cfg.TimeoutSeconds) * time.Second,
+			Transport: transport,
+		},
 	}
 }
 

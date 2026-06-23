@@ -6,30 +6,113 @@ import (
 )
 
 var categoryMap = map[string]string{
+	// Memory & GC
 	"memory":    "Memory & GC",
 	"heap":      "Memory & GC",
 	"gc":        "Memory & GC",
 	"alloc":     "Memory & GC",
 	"mem":       "Memory & GC",
-	"goroutine": "Goroutines",
-	"go":        "Goroutines",
+	"leak":      "Memory & GC",
+	"snapshots": "Memory & Snapshots",
+	"snapshot":  "Memory & Snapshots",
+	"compare":   "Memory & Snapshots",
+	// Goroutines & Threads
+	"goroutine":  "Goroutines",
+	"go":         "Goroutines",
+	"thread":     "Goroutines",
+	"lock":       "Locks & Mutex",
+	"mutex":      "Locks & Mutex",
+	"contention": "Locks & Mutex",
+	"deadlock":   "Locks & Mutex",
+	"sync":       "Locks & Mutex",
+	"waitgroup":  "Locks & Mutex",
+	// Process & Runtime
 	"process":   "Process Info",
+	"runtime":   "Runtime Info",
 	"system":    "System Info",
 	"cpu":       "System Info",
 	"disk":      "System Info",
 	"uptime":    "System Info",
-	"runtime":   "Runtime Info",
+	"pprof":     "Profiling",
+	"profile":   "Profiling",
+	"start":     "Profiling",
+	"stop":      "Profiling",
+	"top":       "Profiling",
+	// Framework
 	"routes":    "Framework",
-	"recent":    "HTTP Requests",
-	"slow":      "HTTP Requests",
-	"error":     "HTTP Requests",
-	"request":   "HTTP Requests",
-	"module":    "Module Info",
-	"build":     "Build Info",
-	"db":        "Database",
+	"gin":       "Framework",
+	"echo":      "Framework",
+	"mux":       "Framework",
+	"chi":       "Framework",
+	// HTTP
+	"recent":     "HTTP Requests",
+	"slow":       "HTTP Requests",
+	"request":    "HTTP Requests",
+	"http":       "HTTP Requests",
+	"outbound":   "HTTP Requests",
+	"client":     "HTTP Requests",
+	// Database
+	"db":         "Database",
+	"gorm":       "Database",
+	"sql":        "Database",
+	"migration":  "Database Migration",
+	"pending":    "Database Migration",
+	// Network
 	"network":   "Network",
 	"dns":       "Network",
-	"env":       "Environment",
+	"tcp":       "Network",
+	"conn":      "Network",
+	"websocket": "WebSocket",
+	"ws":        "WebSocket",
+	// Module & Build
+	"module":    "Module Info",
+	"build":     "Build & Deployment",
+	"deployment": "Build & Deployment",
+	"version":   "Build & Deployment",
+	// Configuration
+	"config":    "Configuration",
+	"env":       "Configuration",
+	"environment": "Configuration",
+	// Cache
+	"cache":     "Cache",
+	"redis":     "Redis",
+	// Health & Security
+	"health":    "Health Checks",
+	"security":  "Security",
+	"auth":      "Security",
+	"cors":      "Security",
+	// Error Tracking
+	"error":     "Error Tracking",
+	"warning":   "Error Tracking",
+	// Feature Flags
+	"feature":   "Feature Flags",
+	"flag":      "Feature Flags",
+	"evaluate":  "Feature Flags",
+	// Endpoint Testing
+	"test":      "Endpoint Testing",
+	"batch":     "Endpoint Testing",
+	"endpoint":  "Endpoint Testing",
+	"coverage":  "Endpoint Testing",
+	// Connection Pool
+	"pool":      "Connection Pool",
+	// File Descriptors
+	"fd":        "File Descriptors",
+	"handle":    "File Descriptors",
+	"open":      "File Descriptors",
+	// Metrics
+	"metric":    "Metrics",
+	"counter":   "Metrics",
+	"gauge":     "Metrics",
+	// Service Registry
+	"registered": "Service Registry",
+	"service":    "Service Registry",
+	"registry":   "Service Registry",
+	"dependencies": "Service Registry",
+	// Context
+	"context":   "Context & Lifecycle",
+	"scheduler": "Scheduler",
+	// Logging
+	"log":       "Logging",
 }
 
 // SystemPromptBuilder generates the system prompt dynamically from registered tools.
@@ -98,13 +181,32 @@ func (b *SystemPromptBuilder) categorizeTools() map[string][]toolEntry {
 }
 
 func extractCategory(toolName string) string {
+	// Remove common verb prefixes
 	name := strings.TrimPrefix(toolName, "get_")
 	name = strings.TrimPrefix(name, "trigger_")
+	name = strings.TrimPrefix(name, "list_")
+	name = strings.TrimPrefix(name, "start_")
+	name = strings.TrimPrefix(name, "stop_")
+	name = strings.TrimPrefix(name, "take_")
+	name = strings.TrimPrefix(name, "compare_")
+	name = strings.TrimPrefix(name, "test_")
+	name = strings.TrimPrefix(name, "batch_")
+	name = strings.TrimPrefix(name, "evaluate_")
+
+	// Try keyword containment on the stripped name
 	for key, cat := range categoryMap {
 		if strings.Contains(name, key) {
 			return cat
 		}
 	}
+
+	// Fallback: try on the full original tool name
+	for key, cat := range categoryMap {
+		if strings.Contains(toolName, key) {
+			return cat
+		}
+	}
+
 	return "Other Tools"
 }
 

@@ -8,8 +8,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -664,9 +666,27 @@ func main() {
 	fmt.Println()
 	log.Println("Server starting on :8080")
 
-	if err := http.ListenAndServe(":8080", router); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	// Graceful shutdown
+	server := &http.Server{Addr: ":8080", Handler: router}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("[Shutdown] Received signal, shutting down gracefully...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("[Shutdown] Error during shutdown: %v", err)
 	}
+	log.Println("[Shutdown] Server stopped")
 }
 
 // ─── Seed data ──────────────────────────────────────────────────────────────

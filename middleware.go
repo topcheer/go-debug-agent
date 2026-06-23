@@ -35,6 +35,10 @@ func Middleware(config *AgentConfig) http.Handler {
 
 	// SSE streaming chat
 	mux.HandleFunc(base+"/api/chat", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -67,6 +71,10 @@ func Middleware(config *AgentConfig) http.Handler {
 
 	// Clear conversation
 	mux.HandleFunc(base+"/api/clear", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -94,7 +102,19 @@ func Middleware(config *AgentConfig) http.Handler {
 		json.NewEncoder(w).Encode(map[string]any{"tools": AllSchemas()})
 	})
 
-	return mux
+	// Wrap with CORS middleware
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		mux.ServeHTTP(w, r)
+	})
 }
 
 // sseCallback implements ChatCallback for SSE streaming.
